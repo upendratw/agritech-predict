@@ -1,0 +1,75 @@
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  margin: 0;
+  padding: 0;
+  background: #f4f7fb;
+  color: #0b1727;
+}
+
+.app {
+  max-width: 900px;
+  margin: 28px auto;
+  padding: 20px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(10, 20, 30, 0.08);
+}
+
+.header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.controls {
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+button {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #e6eef7;
+  background: #1fe0d1;
+  color: #04212a;
+  cursor: pointer;
+}
+
+button[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.preview {
+  margin-top: 16px;
+  display: flex;
+  gap: 16px;
+}
+
+.preview img {
+  max-width: 640px;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #e6eef7;
+}
+
+.sidebar {
+  min-width: 220px;
+}
+.table {
+  margin-top: 12px;
+  border-collapse: collapse;
+  width: 100%;
+}
+.table th, .table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid #f0f4f8;
+}
+.small {
+  font-size: 13px;
+  color: #666;
+}
