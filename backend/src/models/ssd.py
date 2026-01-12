@@ -2,15 +2,10 @@
 """
 Small SSD-like detector (from-scratch, no pretrained weights).
 
-- Lightweight backbone (conv blocks)
-- Extra feature layers for multi-scale detection
-- Prediction heads (localization + classification) per feature map
-- Simple anchor/default-box generator (grid anchors with multiple aspect ratios)
-
 Model outputs:
   locs: (B, num_anchors, 4)  - predicted deltas (SSD encoding)
   confs: (B, num_anchors, num_classes) - class logits (no softmax)
-  anchors: (num_anchors, 4) anchors in xyxy image coordinates
+  anchors: (num_anchors, 4) anchors in (cx,cy,w,h) normalized (0..1)
 """
 from typing import List, Tuple
 import math
@@ -157,11 +152,7 @@ class SSD(nn.Module):
         self.extras = ExtraLayers(in_channels_list=backbone_out_channels)
 
         # Compute the feature-map channels we will actually use for heads.
-        # Forward produces: feature_maps = [f2 (64), f3 (128), extra0(f2->128), extra1(f3->256)]
-        # We take the first 3 feature maps to keep model compact: channels -> [64, 128, 128]
-        # So derive feat_channels accordingly so heads get correct in_channels.
         if channels is None:
-            # derive from backbone_out_channels: [f2, f3, extra0_out]
             self.feat_channels = [backbone_out_channels[0], backbone_out_channels[1], backbone_out_channels[0] * 2]
         else:
             self.feat_channels = channels
@@ -185,29 +176,36 @@ class SSD(nn.Module):
                     nn.init.constant_(m.bias, 0.0)
 
     def _generate_anchors_for_feature_map(self, fmap_h: int, fmap_w: int, scale: float) -> torch.Tensor:
-        anchors = []
-        step_y = self.image_size / fmap_h
-        step_x = self.image_size / fmap_w
+        """
+        Generate anchors for one feature map.
 
+        Returns anchors as (num_anchors, 4) in (cx, cy, w, h) **normalized to 0..1**.
+        - fmap_h, fmap_w: spatial dims of the feature map
+        - scale: relative scale (fraction of image_size) used for widths/heights
+        """
+        anchors = []
+        # step in pixels = image_size / fmap_dim, but for normalized centers we use (j+0.5)/fmap_w etc.
         for i in range(fmap_h):
             for j in range(fmap_w):
-                cy = (i + 0.5) * step_y
-                cx = (j + 0.5) * step_x
+                cy_norm = (i + 0.5) / float(fmap_h)  # normalized center y
+                cx_norm = (j + 0.5) / float(fmap_w)  # normalized center x
                 for ar in self.aspect_ratios:
-                    w = scale * math.sqrt(ar) * self.image_size
-                    h = scale / math.sqrt(ar) * self.image_size
-                    x1 = cx - w / 2.0
-                    y1 = cy - h / 2.0
-                    x2 = cx + w / 2.0
-                    y2 = cy + h / 2.0
-                    anchors.append([x1, y1, x2, y2])
+                    # width/height normalized: w_norm = scale * sqrt(ar)
+                    w_norm = scale * math.sqrt(ar)
+                    h_norm = scale / math.sqrt(ar)
+                    anchors.append([cx_norm, cy_norm, w_norm, h_norm])
         if len(anchors) == 0:
             return torch.zeros((0, 4), dtype=torch.float32)
         return torch.tensor(anchors, dtype=torch.float32)
 
     def generate_anchors(self, feature_maps: List[torch.Tensor]) -> torch.Tensor:
+        """
+        feature_maps: list of feature map tensors; we derive spatial sizes from them.
+        Returns concatenated anchors as (N,4) in (cx,cy,w,h) normalized coords.
+        """
         anchors_all = []
-        scales = [0.08, 0.16, 0.32]  # adjust as needed
+        # scales chosen as fractions of image_size (these are normalized directly)
+        scales = [0.08, 0.16, 0.32]
         for fmap, s in zip(feature_maps, scales):
             _, _, fh, fw = fmap.shape
             a = self._generate_anchors_for_feature_map(fh, fw, s)
@@ -221,7 +219,7 @@ class SSD(nn.Module):
         Returns:
           locs: (B, num_anchors, 4)
           confs: (B, num_anchors, num_classes)
-          anchors: (num_anchors, 4) -- floats in image pixel coords (reference image_size)
+          anchors: (num_anchors, 4) in (cx,cy,w,h) normalized coords (0..1)
         """
         B, C, H, W = x.shape
 
@@ -244,6 +242,6 @@ class SSD(nn.Module):
         locs = torch.cat(locs_list, dim=1) if locs_list else torch.zeros((B, 0, 4), device=x.device)
         confs = torch.cat(confs_list, dim=1) if confs_list else torch.zeros((B, 0, self.num_classes), device=x.device)
 
-        anchors = self.generate_anchors(feature_maps)  # (num_anchors, 4) on CPU by default
+        anchors = self.generate_anchors(feature_maps)  # (num_anchors, 4) normalized (cx,cy,w,h)
 
         return locs, confs, anchors

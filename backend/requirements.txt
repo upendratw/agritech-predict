@@ -1,7 +1,5 @@
 fastapi
-uvicorn[standard]
-torch
-torchvision
-pillow
-numpy
+uvicorn
 python-multipart
+pillow
+ultralytics>=8.0.0

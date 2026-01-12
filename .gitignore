@@ -1,0 +1,19 @@
+cat <<EOF > .gitignore
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Models
+checkpoints/*.pt
+checkpoints/*.onnx
+checkpoints/*.mlmodel
+checkpoints/*.txt
+
+# Runtime
+uploads/
+outputs/
+
+# OS
+.DS_Store
+EOF
