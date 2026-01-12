@@ -4,11 +4,24 @@ cat <<EOF > .gitignore
 __pycache__/
 *.pyc
 
+# Env
+.env
+.env.local
+
+# Build
+dist/
+.build/
+
 # Models
 checkpoints/*.pt
 checkpoints/*.onnx
 checkpoints/*.mlmodel
 checkpoints/*.txt
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
 
 # Runtime
 uploads/
