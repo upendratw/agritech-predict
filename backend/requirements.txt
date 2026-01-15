@@ -3,3 +3,4 @@ uvicorn
 python-multipart
 pillow
 ultralytics>=8.0.0
+mysql-connector-python

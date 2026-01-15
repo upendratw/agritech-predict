@@ -5,7 +5,7 @@ import os
 import base64
 import traceback
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 import numpy as np
 from PIL import Image
@@ -15,25 +15,41 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+# 🔹 NEW: import advice router
+from advice import router as advice_router
+
 # ---------------------------------------------------------
 # App
 # ---------------------------------------------------------
 app = FastAPI(
-    title="agritech-predict backend",
-    description="Inference service using trained YOLOv8 model",
+    title="Agritech Predict Backend",
+    description="AI inference + treatment advice service",
     version="1.0",
 )
 
+# ---------------------------------------------------------
+# Middleware
+# ---------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # restrict later if needed
+    allow_origins=["*"],   # tighten later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ---------------------------------------------------------
-# Paths (FIXED & CLEAN)
+# 🔹 REGISTER ADVICE ROUTER
+# ---------------------------------------------------------
+app.include_router(
+    advice_router,
+    prefix="",             # e.g. /treatment-advice
+    tags=["Treatment Advice"]
+)
+app.include_router(advice_router)
+
+# ---------------------------------------------------------
+# Paths
 # ---------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent
 CHECKPOINTS_DIR = BASE_DIR / "checkpoints"
@@ -51,7 +67,7 @@ except Exception as e:
     ULTRALYTICS_ERROR = str(e)
 
 # ---------------------------------------------------------
-# Globals (loaded once)
+# Globals
 # ---------------------------------------------------------
 MODEL = None
 CLASS_NAMES: List[str] = []
@@ -87,9 +103,8 @@ def load_model():
     MODEL = YOLO(str(MODEL_PATH))
     CLASS_NAMES = load_labels()
 
-    print("✅ Model loaded from:", MODEL_PATH)
-    print("✅ Labels loaded:", CLASS_NAMES)
-
+    print("✅ Model loaded:", MODEL_PATH)
+    print("✅ Labels:", CLASS_NAMES)
 
 # ---------------------------------------------------------
 # Schemas
@@ -109,13 +124,15 @@ class PredictResponse(BaseModel):
     annotated_image_base64: str
     model_path: str
 
-
 # ---------------------------------------------------------
 # Routes
 # ---------------------------------------------------------
 @app.get("/")
 def root():
-    return {"status": "ok", "message": "POST /predict with multipart file field `file`"}
+    return {
+        "status": "ok",
+        "message": "POST /predict | GET /treatment-advice"
+    }
 
 
 @app.post("/predict", response_model=PredictResponse)
@@ -138,7 +155,7 @@ async def predict(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid image: {e}")
 
-    # Run inference
+    # Inference
     try:
         results = MODEL.predict(
             source=np.asarray(image),
@@ -194,11 +211,8 @@ async def predict(
             detail=f"Failed to generate annotated image:\n{traceback.format_exc()}",
         )
 
-    return JSONResponse(
-        status_code=200,
-        content={
-            "detections": [d.dict() for d in detections],
-            "annotated_image_base64": img_b64,
-            "model_path": str(MODEL_PATH),
-        },
-    )
+    return {
+        "detections": [d.dict() for d in detections],
+        "annotated_image_base64": img_b64,
+        "model_path": str(MODEL_PATH),
+    }
