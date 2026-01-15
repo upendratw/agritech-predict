@@ -27,6 +27,10 @@ yarn-error.log*
 uploads/
 outputs/
 
+# Python cache
+__pycache__/
+*.pyc
+
 # OS
 .DS_Store
 EOF
